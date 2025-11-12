@@ -1,0 +1,9 @@
+pgdata/
+.vscode/
+data/
+trash/
+docker-compose.override.yml
+restore.log
+*.tex
+__pycache__/
+*.pyc
