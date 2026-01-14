@@ -1,0 +1,77 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: trains_postgis
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: EYFXfc9KH7kb8pjo1sOV0ZZ3
+      POSTGRES_DB: train
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data
+    # Порт открыт ТОЛЬКО на localhost (127.0.0.1) — из интернета недоступен.
+    # Для DBeaver: подключайтесь через SSH-туннель.
+    ports:
+      - "127.0.0.1:5432:5432"
+    restart: unless-stopped
+    # Больше памяти для pg_restore (OSM/PostGIS), чтобы не падало по OOM
+    mem_limit: 3g
+    # Ограничение CPU: нагрузка не уйдёт в 100%, сервер остаётся отзывчивым
+    cpus: '2'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d train"]
+      interval: 3s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+  
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: t_trip-backend:latest
+    container_name: trains_backend
+    environment:
+      DB_HOST: db        # имя сервиса db = хост внутри сети
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: EYFXfc9KH7kb8pjo1sOV0ZZ3
+      DB_NAME: train
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: t_trip-frontend:latest
+    container_name: trains_frontend
+    environment:
+      API_URL: http://backend:8000
+    ports:
+      - "8501:8501"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  # Одноразовая загрузка направлений РЖД из Excel в БД. Не стартует при docker compose up.
+  loader:
+    image: python:3.12-slim
+    working_dir: /data
+    environment:
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_USER: postgres
+      DB_PASSWORD: EYFXfc9KH7kb8pjo1sOV0ZZ3
+      DB_NAME: train
+    volumes:
+      - .:/data
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles:
+      - load
+    command: ["sh", "-c", "pip install -q pandas openpyxl psycopg2-binary && python scripts/load_train_directions.py"]
