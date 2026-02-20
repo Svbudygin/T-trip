@@ -1,0 +1,14 @@
+# Для разработки: монтирование кода с хоста (изменения применяются без пересборки).
+# Скопируйте в docker-compose.override.yml:
+#   cp docker-compose.override.yml.example docker-compose.override.yml
+#
+# docker-compose автоматически подхватит override при запуске.
+
+services:
+  backend:
+    volumes:
+      - ./backend:/app
+
+  frontend:
+    volumes:
+      - ./frontend:/app
