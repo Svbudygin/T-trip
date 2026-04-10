@@ -75,3 +75,22 @@ services:
     profiles:
       - load
     command: ["sh", "-c", "pip install -q pandas openpyxl psycopg2-binary && python scripts/load_train_directions.py"]
+
+  # Загрузка расписания поездов из CSV в БД. Запуск: docker compose --profile load-schedules run --rm schedule-loader
+  schedule-loader:
+    image: python:3.12-slim
+    working_dir: /data
+    environment:
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_USER: postgres
+      DB_PASSWORD: EYFXfc9KH7kb8pjo1sOV0ZZ3
+      DB_NAME: train
+    volumes:
+      - .:/data
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles:
+      - load-schedules
+    command: ["sh", "-c", "pip install -q psycopg2-binary && python scripts/load_train_schedules.py"]
