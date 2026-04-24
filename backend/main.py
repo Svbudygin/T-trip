@@ -10,6 +10,7 @@ from typing import NamedTuple
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+from rtree import index
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlalchemy import text
 
@@ -157,6 +158,9 @@ class RouteGraph:
         self.has_outgoing: set[str] = set()
         self.has_incoming: set[str] = set()
         self._has_schedules = False
+        self._idx_all: index.Index | None = None
+        self._idx_outgoing: index.Index | None = None
+        self._idx_incoming: index.Index | None = None
 
     async def load(self, session):
         self.edges.clear()
@@ -164,6 +168,9 @@ class RouteGraph:
         self.has_outgoing.clear()
         self.has_incoming.clear()
         self._has_schedules = False
+        self._idx_all = None
+        self._idx_outgoing = None
+        self._idx_incoming = None
 
         rows = await session.execute(
             text("SELECT uic_code, name, lat, lon FROM rzd_stations "
@@ -237,15 +244,62 @@ class RouteGraph:
                     self.has_incoming.add(tc)
                     n += 1
 
+        self._build_spatial_indexes()
+
         logger.info("RouteGraph: %d stations, %d edges (schedules=%s), %d src, %d dst",
                      len(self.stations), n, self._has_schedules,
                      len(self.has_outgoing), len(self.has_incoming))
 
-    def find_nearest(self, lat: float, lon: float, limit: int,
-                     codes_filter: set[str] | None = None,
-                     max_dist_m: float = MAX_WALK_M,
-                     fallback_max_m: float = MAX_NEAREST_FALLBACK_M) -> list[dict]:
-        buf = []
+    def _build_spatial_indexes(self) -> None:
+        """Build R-tree indexes for O(log n) nearest-station lookup."""
+        if not self.stations:
+            return
+
+        props = index.Property()
+        props.dimension = 2
+        idx_all = index.Index(properties=props)
+        idx_out = index.Index(properties=props)
+        idx_in = index.Index(properties=props)
+
+        for i, (code, info) in enumerate(self.stations.items()):
+            lon, lat = info["lon"], info["lat"]
+            bbox = (lon, lat, lon, lat)
+            idx_all.insert(i, bbox, obj=code)
+            if code in self.has_outgoing:
+                idx_out.insert(i, bbox, obj=code)
+            if code in self.has_incoming:
+                idx_in.insert(i, bbox, obj=code)
+
+        self._idx_all = idx_all
+        self._idx_outgoing = idx_out
+        self._idx_incoming = idx_in
+
+    def _spatial_index_for(self, codes_filter: set[str] | None) -> index.Index | None:
+        if codes_filter is self.has_outgoing:
+            return self._idx_outgoing
+        if codes_filter is self.has_incoming:
+            return self._idx_incoming
+        if codes_filter is None:
+            return self._idx_all
+        return None
+
+    def _station_dict(self, code: str, dist_m: int) -> dict:
+        info = self.stations[code]
+        return {
+            "uic_code": code,
+            "name": info["name"],
+            "lat": info["lat"],
+            "lon": info["lon"],
+            "distance_m": dist_m,
+        }
+
+    def _nearest_candidates(self, lat: float, lon: float, n: int,
+                            codes_filter: set[str] | None) -> list[dict]:
+        spatial_idx = self._spatial_index_for(codes_filter)
+        if spatial_idx is not None:
+            return self._nearest_via_rtree(spatial_idx, lat, lon, n, codes_filter)
+
+        buf: list[tuple[float, str]] = []
         for code, info in self.stations.items():
             if codes_filter is not None and code not in codes_filter:
                 continue
@@ -253,17 +307,46 @@ class RouteGraph:
             dlon = info["lon"] - lon
             buf.append((dlat * dlat + dlon * dlon, code))
         buf.sort()
-        out = []
-        for _, code in buf[:limit * 4]:
+        out: list[dict] = []
+        for _, code in buf[:n]:
             info = self.stations[code]
             dist = round(haversine_m(lat, lon, info["lat"], info["lon"]))
-            out.append({
-                "uic_code": code,
-                "name": info["name"],
-                "lat": info["lat"],
-                "lon": info["lon"],
-                "distance_m": dist,
-            })
+            out.append(self._station_dict(code, dist))
+        return out
+
+    def _nearest_via_rtree(self, spatial_idx: index.Index, lat: float, lon: float,
+                           n: int, codes_filter: set[str] | None) -> list[dict]:
+        point = (lon, lat, lon, lat)
+        need = max(n, 1)
+        seen: set[str] = set()
+        out: list[dict] = []
+
+        while True:
+            batch = list(spatial_idx.nearest(point, need, objects=True))
+            for item in batch:
+                code = item.object
+                if code in seen:
+                    continue
+                if codes_filter is not None and code not in codes_filter:
+                    continue
+                seen.add(code)
+                info = self.stations[code]
+                dist = round(haversine_m(lat, lon, info["lat"], info["lon"]))
+                out.append(self._station_dict(code, dist))
+                if len(out) >= n:
+                    break
+            if len(out) >= n or len(batch) < need:
+                break
+            need *= 2
+
+        out.sort(key=lambda s: s["distance_m"])
+        return out
+
+    def find_nearest(self, lat: float, lon: float, limit: int,
+                     codes_filter: set[str] | None = None,
+                     max_dist_m: float = MAX_WALK_M,
+                     fallback_max_m: float = MAX_NEAREST_FALLBACK_M) -> list[dict]:
+        out = self._nearest_candidates(lat, lon, limit * 4, codes_filter)
 
         within_walk = [s for s in out if s["distance_m"] <= max_dist_m]
         if len(within_walk) >= limit:

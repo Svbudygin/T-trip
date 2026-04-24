@@ -8,6 +8,7 @@ WORKDIR /app
 # (опционально, но полезно) пакеты для сборки зависимостей
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    libspatialindex-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # сначала зависимости

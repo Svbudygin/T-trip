@@ -7,3 +7,4 @@ restore.log
 *.tex
 __pycache__/
 *.pyc
+backend/.venv
