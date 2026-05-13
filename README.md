@@ -1,14 +1,16 @@
-# Путешествия — поиск ж/д маршрутов
+# T-Travel — rail route planner
 
-Веб-приложение для поиска маршрутов между двумя точками на карте.
+Web application for finding rail routes between two map coordinates over the RZD network.
 
-> **Развёртывание на новом сервере:** см. [DEPLOYMENT.md](DEPLOYMENT.md) — пошаговая инструкция при получении дампа БД.
-Пользователь вводит координаты «откуда» и «куда», система находит ближайшие станции РЖД
-и показывает до 10 лучших найденных кандидатов по времени или стоимости.
+> **Deploying on a new server:** see [DEPLOYMENT.md](DEPLOYMENT.md) for step-by-step instructions when you receive a database dump.
+
+The user sets points **A** and **B** (coordinates or map clicks), optionally a departure date and time (MSK), and the system returns up to **10** ranked routes optimized by **time** or **cost**.
+
+Production: **https://trip.svbudygin.ru**
 
 ---
 
-## Архитектура
+## Architecture
 
 ```
 ┌──────────────┐     ┌──────────────┐     ┌──────────────────┐
@@ -19,236 +21,158 @@
                                                    ^
                                                    |
                                           ┌────────┴────────┐
-                                          │  loader (разово) │
-                                          │  загрузка данных │
+                                          │  loader (one-off)│
+                                          │  schedule-loader │
                                           └─────────────────┘
 ```
 
-Все сервисы запускаются через **Docker Compose**.
+All services run via **Docker Compose**.
 
 ---
 
-## Структура проекта
+## Project layout
 
 ```
 t_trip/
-├── backend/                 # FastAPI-бэкенд
-│   ├── main.py              # API: POST /search
-│   ├── requirements.txt     # Зависимости Python
+├── backend/                 # FastAPI backend
+│   ├── main.py              # POST /search, POST /reload
+│   ├── requirements.txt
 │   └── Dockerfile
-├── frontend/                # Streamlit-интерфейс
-│   └── app.py               # Веб-форма и вывод маршрутов
-├── scripts/                 # Скрипты для работы с данными
-│   ├── load_train_directions.py   # Загрузка станций и направлений в БД
-│   ├── enrich_excel_with_coords.py # Обогащение Excel координатами
-│   ├── init_train_directions.sql  # SQL-схема таблиц
-│   └── restore-dump.sh           # Восстановление дампа PostGIS
-├── data/                    # Исходные данные (не в git)
-│   ├── trains_directions.xlsx     # Направления РЖД (время, цена)
-│   ├── coordinates.csv            # Координаты станций по коду
-│   ├── stations_full.csv          # Справочник станций РЖД
-│   ├── cites_full.csv             # Справочник городов
-│   ├── train_routes.csv           # Маршруты (CSV-версия)
-│   └── ...
-├── pgdata/                  # Данные PostgreSQL (не в git)
-├── docker-compose.yml       # Все сервисы
-├── .gitignore
-└── README.md                # Этот файл
+├── frontend/                # Streamlit UI
+│   └── app.py
+├── scripts/
+│   ├── load_train_directions.py   # Stations + aggregated directions
+│   ├── load_train_schedules.py    # Per-train timetable CSV → DB
+│   ├── enrich_excel_with_coords.py
+│   ├── init_train_directions.sql
+│   ├── benchmark_search.py          # Latency benchmark
+│   └── restore-dump.sh
+├── tests/                   # pytest OD suite + oracle tests
+├── data/                    # Source data (not in git)
+├── docker-compose.yml
+└── README.md
 ```
 
 ---
 
-## Таблицы в БД (база `train`)
+## Database (`train`)
 
-### Из дампа OSM (не трогаем)
+### From OSM dump
 
-| Таблица | Описание |
-|---------|----------|
-| `osm_stations` | Станции из OSM: `osm_id`, `name`, `railway`, `geom` |
-| `planet_osm_nodes` | Все узлы OSM с тегами (hstore). Содержит `uic_ref` — код станции РЖД |
-| `planet_osm_point` | Точки OSM (аэропорты, остановки и т.д.) |
-| `planet_osm_line`, `planet_osm_polygon`, `planet_osm_roads` | Линии, полигоны, дороги |
-| `city_areas` | Городские зоны |
+| Table | Description |
+|-------|-------------|
+| `planet_osm_nodes` | OSM nodes with `hstore` tags (`uic_ref` for RZD stations) |
+| `osm_stations` | Station geometries (map / import helper) |
+| Other `planet_osm_*` | Lines, polygons, roads |
 
-### Создаются скриптом загрузки
+### Created by loaders
 
-| Таблица | Описание |
-|---------|----------|
-| `rzd_stations` | Станции РЖД: `uic_code` (PK), `node_id`, `name`, `lat`, `lon`. Заполняется из `planet_osm_nodes` по тегу `uic_ref` |
-| `train_directions` | Направления: `from_code`, `to_code` (коды UIC), `duration_min`, `price_rub`. Заполняется из Excel |
-
----
-
-## Как работает поиск
-
-При старте бэкенд загружает **весь граф** поездных направлений в память (14 774 узла, 32 174 ребра после ETL).
-Поиск маршрутов выполняется **алгоритмом Дейкстры** с ограничением на число пересадок.
-
-1. Пользователь вводит координаты точки **А** (откуда) и точки **Б** (куда).
-2. Бэкенд находит **10 ближайших станций РЖД** с маршрутами к каждой точке.
-3. Для каждой стартовой станции запускается **Дейкстра** по графу `train_directions` (макс. 3 ж/д плеча = до 2 пересадок).
-4. К каждому маршруту добавляются **пешие плечи** (от точки А до станции отправления и от станции прибытия до точки Б).
-5. На каждую пересадку добавляется штраф **30 мин** ожидания.
-6. Маршруты сортируются по времени или стоимости, возвращаются **до 10 лучших**.
-
-Параметры алгоритма:
-- Ближайших станций: **10** к каждой точке
-- Макс. пересадок: **2** (до 3 ж/д плеч)
-- Скорость пешком: **5 км/ч**
-- Штраф пересадки: **30 мин**
+| Table | Description |
+|-------|-------------|
+| `rzd_stations` | `uic_code`, `name`, `lat`, `lon` (matched via OSM `uic_ref`) |
+| `train_directions` | Aggregated edges: `duration_min`, `price_rub` (fallback graph) |
+| `train_schedules` | Per-train rows: times, regularity, price (production graph) |
 
 ---
 
-## Запуск
+## How routing works
 
-### 1. Поднять все сервисы
+On startup the backend loads stations and edges into an **in-memory graph** and builds **R-tree** indexes for nearest-station lookup.
+
+1. Find up to **10** connected stations near each endpoint (prefer ≤3 km, fallback up to 100 km).
+2. **Multi-source Dijkstra** on an augmented product graph (max **3** train legs = 2 transfers).
+3. **Access legs:** walk (≤3 km) or taxi (>3 km) from/to coordinates.
+4. **Scheduled mode** (production): when `train_schedules` is loaded and the request includes `departure_date` + `departure_time`, time-dependent Dijkstra uses real boarding times and waits.
+5. **Static mode:** no clock times; optional date filter on regularity; fixed **15 min** transfer allowance per transfer when optimizing by time.
+6. Deduplicate, sort, return up to **10** routes.
+
+| Parameter | Value |
+|-------------|--------|
+| Nearby stations (search) | 10 per endpoint |
+| Nearby stations (JSON response) | 3 closest |
+| Max train legs | 3 |
+| Transfer penalty (static, time mode) | 15 min |
+| Min transfer (scheduled) | 15 min (configurable via API) |
+| Walk speed | 5 km/h |
+| Taxi speed | 30 km/h (beyond 3 km) |
+
+---
+
+## Quick start
+
+### 1. Start services
 
 ```bash
 cd /root/t_trip
 docker compose up -d --build
 ```
 
-> Для разработки с монтированием кода: `cp docker-compose.override.yml.example docker-compose.override.yml`
+Optional dev bind-mount: `cp docker-compose.override.yml.example docker-compose.override.yml`
 
-Это запустит:
-- **db** — PostgreSQL + PostGIS (внутренний порт 5432, **закрыт** снаружи для безопасности)
-- **backend** — FastAPI (порт 8000)
-- **frontend** — Streamlit (порт 8501)
+- **db** — PostgreSQL + PostGIS (port 5432 bound to localhost only)
+- **backend** — `:8000`
+- **frontend** — `:8501`
 
-> **Безопасность:** порт 5432 закрыт наружу, чтобы предотвратить атаки ботов-вымогателей.
-> Для подключения через DBeaver используйте **SSH-туннель** (localhost:5432 → сервер:5432).
-
-### 2. Загрузить данные из Excel в БД (один раз)
+### 2. Load aggregated directions (one-off)
 
 ```bash
 docker compose --profile load run --rm loader
 ```
 
-Скрипт:
-- Создаёт таблицы `rzd_stations` и `train_directions`.
-- Из `planet_osm_nodes` берёт российские станции по `uic_ref`.
-- Из `data/trains_directions.xlsx` загружает время и цену.
+### 3. Load per-train schedules (recommended for production)
 
-### 3. Открыть приложение
+```bash
+docker compose --profile load-schedules run --rm schedule-loader
+```
 
-Streamlit: **http://<IP-сервера>:8501**
+Then reload the in-memory graph (or restart backend):
 
-FastAPI (Swagger): **http://<IP-сервера>:8000/docs**
+```bash
+curl -X POST http://localhost:8000/reload
+```
+
+### 4. Open the app
+
+- Streamlit: **http://&lt;host&gt;:8501**
+- API docs: **http://&lt;host&gt;:8000/docs**
 
 ---
 
-## Управление контейнерами
-
-### Статус всех сервисов
+## Docker commands
 
 ```bash
 docker compose ps
-```
-
-### Логи
-
-```bash
-# Логи конкретного сервиса
-docker compose logs backend
-docker compose logs frontend
-docker compose logs db
-
-# Последние 50 строк
-docker compose logs backend --tail 50
-
-# В реальном времени (follow)
 docker compose logs -f backend
-
-# Все сервисы сразу
-docker compose logs -f
-```
-
-### Перезапуск
-
-```bash
-# Перезапустить один сервис
 docker compose restart backend
-docker compose restart frontend
-
-# Пересобрать и перезапустить (после изменения кода)
 docker compose up -d --build backend
-
-# Перезапустить всё
-docker compose down && docker compose up -d
-```
-
-### Остановить
-
-```bash
-# Остановить всё (контейнеры сохраняются)
-docker compose stop
-
-# Остановить и удалить контейнеры (данные в pgdata сохраняются)
 docker compose down
 ```
 
 ---
 
-## Подключение к БД через DBeaver (SSH-туннель)
+## Database access (DBeaver via SSH tunnel)
 
-Порт 5432 закрыт снаружи — прямое подключение из интернета невозможно. Используйте SSH-туннель.
+Port 5432 is not exposed publicly. Use an SSH tunnel:
 
-### Настройка в DBeaver
-
-1. **Создайте новое подключение** → PostgreSQL
-2. Вкладка **SSH**:
-   - Включите `Use SSH Tunnel`
-   - **Host**: IP-адрес вашего сервера
-   - **Port**: 22
-   - **User**: ваш SSH-пользователь (например, `root`)
-   - **Authentication**: ключ (`Private Key`) или пароль
-3. Вкладка **Main**:
-   - **Host**: `localhost`
-   - **Port**: `5432`
-   - **Database**: `train`
-   - **Username**: `postgres`
-   - **Password**: см. `POSTGRES_PASSWORD` в `docker-compose.yml`
+- SSH: server IP, port 22, your user/key
+- PostgreSQL: `localhost:5432`, database `train`, user `postgres`, password from `docker-compose.yml`
 
 ---
 
-## Восстановление дампа БД
-
-Если нужно заново залить дамп OSM/PostGIS:
+## Restore OSM dump
 
 ```bash
 chmod +x scripts/restore-dump.sh
 ./scripts/restore-dump.sh /path/to/train1.dump
-```
-
-Скрипт копирует дамп в контейнер и запускает `pg_restore` внутри.
-После восстановления нужно заново запустить загрузку направлений:
-
-```bash
 docker compose --profile load run --rm loader
+docker compose --profile load-schedules run --rm schedule-loader
 ```
-
----
-
-## Обогащение Excel координатами
-
-Добавляет к каждой строке `trains_directions.xlsx` колонки `origin_latitude`, `origin_longitude`, `destination_latitude`, `destination_longitude`:
-
-```bash
-docker compose --profile load run --rm loader \
-  sh -c "pip install -q pandas openpyxl psycopg2-binary && python scripts/enrich_excel_with_coords.py"
-```
-
-Результат: `data/trains_directions_with_coords.xlsx` и `.csv`.
 
 ---
 
 ## API
 
-### POST /search
-
-Поиск маршрутов по координатам.
-
-**Запрос:**
+### `POST /search`
 
 ```json
 {
@@ -256,43 +180,47 @@ docker compose --profile load run --rm loader \
   "from_lon": 37.6173,
   "to_lat": 59.9343,
   "to_lon": 30.3351,
-  "optimize_by": "time"
+  "optimize_by": "time",
+  "departure_date": "2026-05-26",
+  "departure_time": "07:00",
+  "min_transfer_min": 15
 }
 ```
 
-**Ответ:** содержит ближайшие станции и маршруты с детализацией по плечам (legs):
+Response includes `nearest_from`, `nearest_to`, and `routes[]` with `legs` (walk/taxi + train), `scheduled`, boarding/arrival labels when applicable.
 
-```json
-{
-  "from_point": {"lat": 55.7558, "lon": 37.6173},
-  "to_point": {"lat": 59.9343, "lon": 30.3351},
-  "nearest_from": [{"uic_code": "2006004", "name": "Москва-Пассажирская", "distance_m": 1500}],
-  "nearest_to": [{"uic_code": "2004001", "name": "Санкт-Петербург-Главный", "distance_m": 800}],
-  "optimize_by": "time",
-  "routes": [
-    {
-      "id": 1,
-      "total_duration_min": 405,
-      "total_price_rub": 8500.00,
-      "transfers": 0,
-      "legs": [
-        {"type": "walk", "from_name": "Точка А", "to_name": "Москва-Пассажирская", "duration_min": 45, "price_rub": 0, "distance_m": 3320},
-        {"type": "train", "from_name": "Москва-Пассажирская", "to_name": "Санкт-Петербург-Главный", "duration_min": 360, "price_rub": 8500},
-        {"type": "walk", "from_name": "Санкт-Петербург-Главный", "to_name": "Точка Б", "duration_min": 21, "price_rub": 0, "distance_m": 1741}
-      ]
-    }
-  ]
-}
+### `POST /reload`
+
+Rebuild graph and R-tree indexes from the database. Returns station/edge counts and `has_schedules`.
+
+---
+
+## Tests
+
+Against a running backend (`API_URL`, default `http://localhost:8000`):
+
+```bash
+pip install -r tests/requirements.txt
+pytest tests/ -v
+```
+
+- `tests/od_suite.yaml` — 50 integration cases
+- `tests/test_routing_optimality.py` — synthetic-graph oracle checks
+
+Benchmark:
+
+```bash
+python scripts/benchmark_search.py
 ```
 
 ---
 
-## Технологии
+## Stack
 
-| Компонент | Технология |
-|-----------|-----------|
-| БД | PostgreSQL 16 + PostGIS 3.4 |
-| Бэкенд | Python 3.12, FastAPI, SQLAlchemy (async), asyncpg |
-| Фронтенд | Streamlit |
-| Контейнеризация | Docker Compose |
-| Данные | OpenStreetMap (дамп), РЖД (Excel) |
+| Component | Technology |
+|-----------|------------|
+| Database | PostgreSQL 16 + PostGIS 3.4 |
+| Backend | Python 3.12, FastAPI, SQLAlchemy (async), asyncpg, rtree |
+| Frontend | Streamlit, Folium |
+| Deploy | Docker Compose, Nginx + HTTPS (production) |
+| Data | OSM (dump), RZD Excel + schedule CSV |
