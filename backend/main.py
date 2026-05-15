@@ -370,7 +370,8 @@ class RouteGraph:
                departure_date: date | None = None,
                departure_time: time | None = None,
                min_transfer_min: int = DEFAULT_MIN_TRANSFER_MIN) -> list[dict]:
-        if departure_date is not None and departure_time is not None:
+        if (departure_date is not None and departure_time is not None
+                and self._has_schedules):
             return self._search_scheduled(
                 from_stations, to_stations, optimize_by, max_routes,
                 from_point, to_point,

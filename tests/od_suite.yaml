@@ -1,0 +1,430 @@
+# OD test suite: 50 origin–destination pairs for POST /search validation.
+# Expectations use ranges and structural properties, not exact golden routes.
+
+defaults:
+  departure_date: "2026-05-26"
+  departure_time: "08:00"
+  optimize_by: time
+
+cases:
+  # --- Direct / major city pairs (scheduled) ---
+  - id: msk_spb
+    category: direct
+    from_lat: 55.7558
+    from_lon: 37.6173
+    to_lat: 59.9343
+    to_lon: 30.3351
+    expect: {status: 200, min_routes: 1, max_transfers: 0, duration_min: [200, 700], scheduled: true}
+
+  - id: spb_msk
+    category: direct
+    from_lat: 59.9343
+    from_lon: 30.3351
+    to_lat: 55.7558
+    to_lon: 37.6173
+    expect: {status: 200, min_routes: 1, max_transfers: 0, duration_min: [200, 700], scheduled: true}
+
+  - id: msk_nn
+    category: direct
+    from_lat: 55.7558
+    from_lon: 37.6173
+    to_lat: 56.3269
+    to_lon: 44.0065
+    expect: {status: 200, min_routes: 1, max_transfers: 0, duration_min: [200, 600], scheduled: true}
+
+  - id: nn_msk
+    category: direct
+    from_lat: 56.3269
+    from_lon: 44.0065
+    to_lat: 55.7558
+    to_lon: 37.6173
+    expect: {status: 200, min_routes: 1, max_transfers: 1, duration_min: [200, 700], scheduled: true}
+
+  - id: msk_tula
+    category: direct
+    from_lat: 55.7558
+    from_lon: 37.6173
+    to_lat: 54.1931
+    to_lon: 37.6173
+    expect: {status: 200, min_routes: 1, max_transfers: 1, duration_min: [120, 500], scheduled: true}
+
+  - id: ekb_nsk
+    category: direct
+    from_lat: 56.8389
+    from_lon: 60.6057
+    to_lat: 55.0084
+    to_lon: 82.9357
+    expect: {status: 200, min_routes: 1, max_transfers: 1, duration_min: [600, 2400], scheduled: true}
+
+  - id: nsk_ekb
+    category: direct
+    from_lat: 55.0084
+    from_lon: 82.9357
+    to_lat: 56.8389
+    to_lon: 60.6057
+    expect: {status: 200, min_routes: 1, max_transfers: 1, duration_min: [600, 2400], scheduled: true}
+
+  - id: rostov_krasnodar
+    category: direct
+    from_lat: 47.2357
+    from_lon: 39.7015
+    to_lat: 45.0355
+    to_lon: 38.9753
+    expect: {status: 200, min_routes: 1, max_transfers: 1, duration_min: [120, 900], scheduled: true}
+
+  - id: voronezh_msk
+    category: direct
+    from_lat: 51.6720
+    from_lon: 39.1843
+    to_lat: 55.7558
+    to_lon: 37.6173
+    expect: {status: 200, min_routes: 1, max_transfers: 1, duration_min: [300, 1200], scheduled: true}
+
+  - id: msk_tver
+    category: direct
+    from_lat: 55.7558
+    from_lon: 37.6173
+    to_lat: 56.8587
+    to_lon: 35.9176
+    expect: {status: 200, min_routes: 1, max_transfers: 1, duration_min: [120, 500], scheduled: true}
+
+  - id: msk_yaroslavl
+    category: direct
+    from_lat: 55.7558
+    from_lon: 37.6173
+    to_lat: 57.6261
+    to_lon: 39.8845
+    expect: {status: 200, min_routes: 1, max_transfers: 1, duration_min: [180, 900], scheduled: true}
+
+  - id: spb_tver
+    category: direct
+    from_lat: 59.9343
+    from_lon: 30.3351
+    to_lat: 56.8587
+    to_lon: 35.9176
+    expect: {status: 200, min_routes: 1, max_transfers: 1, duration_min: [120, 900], scheduled: true}
+
+  # --- Routes with transfers ---
+  - id: msk_kazan
+    category: transfer
+    from_lat: 55.7558
+    from_lon: 37.6173
+    to_lat: 55.7963
+    to_lon: 49.1088
+    expect: {status: 200, min_routes: 1, max_transfers: 2, duration_min: [600, 2000], scheduled: true}
+
+  - id: msk_samara
+    category: transfer
+    from_lat: 55.7558
+    from_lon: 37.6173
+    to_lat: 53.2001
+    to_lon: 50.1500
+    expect: {status: 200, min_routes: 1, max_transfers: 2, duration_min: [600, 2000], scheduled: true}
+
+  - id: msk_ekaterinburg
+    category: transfer
+    from_lat: 55.7558
+    from_lon: 37.6173
+    to_lat: 56.8389
+    to_lon: 60.6057
+    expect: {status: 200, min_routes: 1, max_transfers: 2, duration_min: [900, 3000], scheduled: true}
+
+  - id: msk_volgograd
+    category: transfer
+    from_lat: 55.7558
+    from_lon: 37.6173
+    to_lat: 48.7080
+    to_lon: 44.5133
+    expect: {status: 200, min_routes: 0, scheduled: true}
+
+  - id: msk_omsk
+    category: transfer
+    from_lat: 55.7558
+    from_lon: 37.6173
+    to_lat: 54.9885
+    to_lon: 73.3242
+    expect: {status: 200, min_routes: 1, max_transfers: 2, duration_min: [1200, 4000], scheduled: true}
+
+  - id: spb_murmansk
+    category: transfer
+    from_lat: 59.9343
+    from_lon: 30.3351
+    to_lat: 68.9585
+    to_lon: 33.0827
+    expect: {status: 200, min_routes: 1, max_transfers: 2, duration_min: [600, 3000], scheduled: true}
+
+  - id: perm_ekaterinburg
+    category: transfer
+    from_lat: 58.0105
+    from_lon: 56.2502
+    to_lat: 56.8389
+    to_lon: 60.6057
+    expect: {status: 200, min_routes: 1, max_transfers: 2, duration_min: [300, 1500], scheduled: true}
+
+  - id: ufa_chelyabinsk
+    category: transfer
+    from_lat: 54.7388
+    from_lon: 55.9721
+    to_lat: 55.1644
+    to_lon: 61.4368
+    expect: {status: 200, min_routes: 1, max_transfers: 2, duration_min: [300, 3500], scheduled: true}
+
+  - id: chelyabinsk_omsk
+    category: transfer
+    from_lat: 55.1644
+    from_lon: 61.4368
+    to_lat: 54.9885
+    to_lon: 73.3242
+    expect: {status: 200, min_routes: 1, max_transfers: 2, duration_min: [600, 5000], scheduled: true}
+
+  - id: krasnoyarsk_irkutsk
+    category: transfer
+    from_lat: 56.0153
+    from_lon: 92.8932
+    to_lat: 52.2869
+    to_lon: 104.3050
+    expect: {status: 200, min_routes: 1, max_transfers: 2, duration_min: [600, 3000], scheduled: true}
+
+  # --- Long haul ---
+  - id: msk_vladivostok
+    category: long_haul
+    from_lat: 55.7558
+    from_lon: 37.6173
+    to_lat: 43.1198
+    to_lon: 131.8869
+    expect: {status: 200, min_routes: 1, max_transfers: 2, duration_min: [5000, 20000], scheduled: true}
+
+  - id: msk_krasnoyarsk
+    category: long_haul
+    from_lat: 55.7558
+    from_lon: 37.6173
+    to_lat: 56.0153
+    to_lon: 92.8932
+    expect: {status: 200, min_routes: 1, max_transfers: 2, duration_min: [2000, 8000], scheduled: true}
+
+  - id: spb_ekaterinburg
+    category: long_haul
+    from_lat: 59.9343
+    from_lon: 30.3351
+    to_lat: 56.8389
+    to_lon: 60.6057
+    expect: {status: 200, min_routes: 1, max_transfers: 2, duration_min: [1500, 5000], scheduled: true}
+
+  - id: msk_rostov
+    category: long_haul
+    from_lat: 55.7558
+    from_lon: 37.6173
+    to_lat: 47.2357
+    to_lon: 39.7015
+    expect: {status: 200, min_routes: 1, max_transfers: 2, duration_min: [900, 3000], scheduled: true}
+
+  - id: kaliningrad_moscow
+    category: long_haul
+    from_lat: 54.7104
+    from_lon: 20.4522
+    to_lat: 55.7558
+    to_lon: 37.6173
+    expect: {status: 200, min_routes: 1, max_transfers: 2, duration_min: [600, 4000], scheduled: true}
+
+  # --- Same metropolitan area ---
+  - id: spb_same_area
+    category: same_area
+    from_lat: 59.9343
+    from_lon: 30.3351
+    to_lat: 59.9311
+    to_lon: 30.3609
+    expect: {status: 200, min_routes: 1, max_transfers: 1, max_duration_min: 300, scheduled: true}
+
+  - id: msk_same_area
+    category: same_area
+    from_lat: 55.7558
+    from_lon: 37.6173
+    to_lat: 55.7520
+    to_lon: 37.6175
+    expect: {status: 200, min_routes: 1, max_transfers: 1, max_duration_min: 400, scheduled: true}
+
+  - id: kazan_same_area
+    category: same_area
+    from_lat: 55.7963
+    from_lon: 49.1088
+    to_lat: 55.7900
+    to_lon: 49.1200
+    expect: {status: 200, min_routes: 1, max_transfers: 1, max_duration_min: 400, scheduled: true}
+
+  # --- Remote / fallback nearest station ---
+  - id: village_near_tula
+    category: remote
+    from_lat: 54.19
+    from_lon: 37.62
+    to_lat: 55.7558
+    to_lon: 37.6173
+    expect: {status: 200, min_routes: 1, max_transfers: 2, duration_min: [120, 1500], scheduled: true}
+
+  - id: village_near_spb
+    category: remote
+    from_lat: 60.05
+    from_lon: 30.50
+    to_lat: 59.9343
+    to_lon: 30.3351
+    expect: {status: 200, min_routes: 1, max_transfers: 1, max_duration_min: 600, scheduled: true}
+
+  - id: remote_siberia
+    category: remote
+    from_lat: 58.5
+    from_lon: 78.0
+    to_lat: 55.0084
+    to_lon: 82.9357
+    expect: {status: 200, min_routes: 1, max_transfers: 2, duration_min: [300, 5000], scheduled: true}
+
+  - id: remote_to_moscow
+    category: remote
+    from_lat: 56.5
+    from_lon: 37.5
+    to_lat: 55.7558
+    to_lon: 37.6173
+    expect: {status: 200, min_routes: 1, max_transfers: 1, duration_min: [60, 800], scheduled: true}
+
+  # --- Static mode (no departure time → aggregated durations) ---
+  - id: static_msk_spb
+    category: static
+    from_lat: 55.7558
+    from_lon: 37.6173
+    to_lat: 59.9343
+    to_lon: 30.3351
+    departure_time: null
+    expect: {status: 200, min_routes: 1, max_transfers: 1, duration_min: [180, 600], scheduled: false}
+
+  - id: static_msk_kazan
+    category: static
+    from_lat: 55.7558
+    from_lon: 37.6173
+    to_lat: 55.7963
+    to_lon: 49.1088
+    departure_time: null
+    expect: {status: 200, min_routes: 1, max_transfers: 2, duration_min: [600, 2500], scheduled: false}
+
+  - id: static_ekb_nsk
+    category: static
+    from_lat: 56.8389
+    from_lon: 60.6057
+    to_lat: 55.0084
+    to_lon: 82.9357
+    departure_time: null
+    expect: {status: 200, min_routes: 1, max_transfers: 2, duration_min: [600, 3000], scheduled: false}
+
+  - id: static_date_only_nn
+    category: static
+    from_lat: 55.7558
+    from_lon: 37.6173
+    to_lat: 56.3269
+    to_lon: 44.0065
+    departure_time: null
+    departure_date: "2026-05-26"
+    expect: {status: 200, min_routes: 1, max_transfers: 1, scheduled: false}
+
+  - id: static_spb_msk
+    category: static
+    from_lat: 59.9343
+    from_lon: 30.3351
+    to_lat: 55.7558
+    to_lon: 37.6173
+    departure_time: null
+    expect: {status: 200, min_routes: 1, max_transfers: 1, duration_min: [180, 700], scheduled: false}
+
+  # --- Cost optimization ---
+  - id: cost_msk_spb
+    category: cost
+    optimize_by: cost
+    from_lat: 55.7558
+    from_lon: 37.6173
+    to_lat: 59.9343
+    to_lon: 30.3351
+    expect: {status: 200, min_routes: 1, max_transfers: 2, min_price_rub: 500, scheduled: true}
+
+  - id: cost_msk_kazan
+    category: cost
+    optimize_by: cost
+    from_lat: 55.7558
+    from_lon: 37.6173
+    to_lat: 55.7963
+    to_lon: 49.1088
+    expect: {status: 200, min_routes: 1, max_transfers: 2, min_price_rub: 500, scheduled: true}
+
+  - id: cost_msk_samara
+    category: cost
+    optimize_by: cost
+    from_lat: 55.7558
+    from_lon: 37.6173
+    to_lat: 53.2001
+    to_lon: 50.1500
+    expect: {status: 200, min_routes: 1, max_transfers: 2, min_price_rub: 500, scheduled: true}
+
+  - id: cost_nn_kazan
+    category: cost
+    optimize_by: cost
+    from_lat: 56.3269
+    from_lon: 44.0065
+    to_lat: 55.7963
+    to_lon: 49.1088
+    expect: {status: 200, min_routes: 1, max_transfers: 2, min_price_rub: 200, scheduled: true}
+
+  - id: cost_spb_msk
+    category: cost
+    optimize_by: cost
+    from_lat: 59.9343
+    from_lon: 30.3351
+    to_lat: 55.7558
+    to_lon: 37.6173
+    expect: {status: 200, min_routes: 1, max_transfers: 2, min_price_rub: 500, scheduled: true}
+
+  # --- Scheduled time variants ---
+  - id: scheduled_early_msk_spb
+    category: scheduled_time
+    from_lat: 55.7558
+    from_lon: 37.6173
+    to_lat: 59.9343
+    to_lon: 30.3351
+    departure_time: "06:00"
+    expect: {status: 200, min_routes: 1, max_transfers: 1, duration_min: [200, 800], scheduled: true}
+
+  - id: scheduled_late_msk_spb
+    category: scheduled_time
+    from_lat: 55.7558
+    from_lon: 37.6173
+    to_lat: 59.9343
+    to_lon: 30.3351
+    departure_time: "18:00"
+    expect: {status: 200, min_routes: 1, max_transfers: 1, duration_min: [200, 900], scheduled: true}
+
+  - id: scheduled_msk_ufa
+    category: scheduled_time
+    from_lat: 55.7558
+    from_lon: 37.6173
+    to_lat: 54.7388
+    to_lon: 55.9721
+    expect: {status: 200, min_routes: 1, max_transfers: 2, duration_min: [900, 3000], scheduled: true}
+
+  - id: scheduled_voronezh_rostov
+    category: scheduled_time
+    from_lat: 51.6720
+    from_lon: 39.1843
+    to_lat: 47.2357
+    to_lon: 39.7015
+    expect: {status: 200, min_routes: 1, max_transfers: 2, duration_min: [300, 2000], scheduled: true}
+
+  # --- Edge cases ---
+  - id: ocean_fallback
+    category: edge
+    from_lat: 55.0
+    from_lon: 12.0
+    to_lat: 55.7558
+    to_lon: 37.6173
+    expect: {status: 200, min_routes: 1, max_transfers: 2, duration_min: [600, 12000], scheduled: true}
+
+  - id: same_point_msk
+    category: edge
+    from_lat: 55.7558
+    from_lon: 37.6173
+    to_lat: 55.7558
+    to_lon: 37.6173
+    expect: {status: 200, min_routes: 1, max_transfers: 1, max_duration_min: 400, scheduled: true}

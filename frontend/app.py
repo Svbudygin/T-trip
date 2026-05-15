@@ -15,16 +15,61 @@ st.set_page_config(page_title="Trip", page_icon="✈", layout="wide")
 
 st.markdown("""<style>
 .main .block-container{padding-top:1rem;max-width:1200px}
-.leg-walk{background:#e8f5e9;border-left:4px solid #66bb6a;border-radius:6px;padding:.4rem .75rem;margin:.3rem 0}
-.leg-train{background:#e3f2fd;border-left:4px solid #42a5f5;border-radius:6px;padding:.4rem .75rem;margin:.3rem 0}
+
+/* --- карточки маршрута (светлая тема) --- */
+.leg-walk{background:#e8f5e9;border-left:4px solid #66bb6a;border-radius:6px;padding:.4rem .75rem;margin:.3rem 0;color:#1b5e20}
+.leg-walk b{color:#1b5e20}
+.leg-train{background:#e3f2fd;border-left:4px solid #42a5f5;border-radius:6px;padding:.4rem .75rem;margin:.3rem 0;color:#0d47a1}
+.leg-train b{color:#0d47a1}
 .leg-transfer{background:#fff8e1;border-left:4px solid #ffca28;border-radius:6px;padding:.25rem .75rem;margin:.15rem 0;font-size:.85em;color:#6d4c00}
 .leg-wait{background:#f3e5f5;border-left:4px solid #ab47bc;border-radius:6px;padding:.25rem .75rem;margin:.15rem 0;font-size:.85em;color:#4a148c}
-.route-header{background:#fafafa;border:1px solid #e0e0e0;border-radius:8px;padding:.6rem 1rem;margin-top:.5rem}
-.station-card{background:#f0f2f6;border-radius:8px;padding:.5rem .75rem;margin:.25rem 0}
-.train-no{background:#1565c0;color:white;border-radius:4px;padding:0 6px;font-weight:bold;font-size:.9em}
-.train-time{color:#555;font-size:.88em}
-.regularity{color:#888;font-size:.8em;margin-top:2px}
-.scheduled-tag{background:#2e7d32;color:white;border-radius:4px;padding:0 6px;font-size:.75em;margin-left:6px}
+.route-header{background:#fafafa;border:1px solid #e0e0e0;border-radius:8px;padding:.6rem 1rem;margin-top:.5rem;color:#31333f}
+.route-header b{color:#31333f}
+.station-card{background:#f0f2f6;border-radius:8px;padding:.5rem .75rem;margin:.25rem 0;color:#31333f}
+.station-card b{color:#31333f}
+.train-no{background:#1565c0;color:#fff;border-radius:4px;padding:0 6px;font-weight:bold;font-size:.9em}
+.train-time{color:#37474f;font-size:.88em}
+.regularity{color:#546e7a;font-size:.8em;margin-top:2px}
+.scheduled-tag{background:#2e7d32;color:#fff;border-radius:4px;padding:0 6px;font-size:.75em;margin-left:6px}
+
+/* --- тёмная тема Streamlit --- */
+[data-theme="dark"] .leg-walk,
+.stApp[data-theme="dark"] .leg-walk{
+  background:#1e3d2e;color:#c8e6c9;border-left-color:#66bb6a}
+[data-theme="dark"] .leg-walk b,
+.stApp[data-theme="dark"] .leg-walk b{color:#a5d6a7}
+
+[data-theme="dark"] .leg-train,
+.stApp[data-theme="dark"] .leg-train{
+  background:#1a2e42;color:#bbdefb;border-left-color:#42a5f5}
+[data-theme="dark"] .leg-train b,
+.stApp[data-theme="dark"] .leg-train b{color:#90caf9}
+
+[data-theme="dark"] .leg-transfer,
+.stApp[data-theme="dark"] .leg-transfer{
+  background:#3d3420;color:#ffe082;border-left-color:#ffca28}
+
+[data-theme="dark"] .leg-wait,
+.stApp[data-theme="dark"] .leg-wait{
+  background:#2d1f33;color:#e1bee7;border-left-color:#ab47bc}
+
+[data-theme="dark"] .route-header,
+.stApp[data-theme="dark"] .route-header{
+  background:#262730;color:#fafafa;border-color:#464646}
+[data-theme="dark"] .route-header b,
+.stApp[data-theme="dark"] .route-header b{color:#fafafa}
+
+[data-theme="dark"] .station-card,
+.stApp[data-theme="dark"] .station-card{
+  background:#262730;color:#fafafa;border:1px solid #464646}
+[data-theme="dark"] .station-card b,
+.stApp[data-theme="dark"] .station-card b{color:#fafafa}
+
+[data-theme="dark"] .train-time,
+.stApp[data-theme="dark"] .train-time{color:#b0bec5}
+
+[data-theme="dark"] .regularity,
+.stApp[data-theme="dark"] .regularity{color:#9e9e9e}
 </style>""", unsafe_allow_html=True)
 
 st.markdown("## ✈ Путешествия — поиск маршрутов")

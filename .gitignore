@@ -8,3 +8,5 @@ restore.log
 __pycache__/
 *.pyc
 backend/.venv
+tests/.venv
+.pytest_cache/
